@@ -1,0 +1,5 @@
+FROM bitnami/spark:latest
+
+USER root
+RUN pip install pymongo pandas
+USER 1001
