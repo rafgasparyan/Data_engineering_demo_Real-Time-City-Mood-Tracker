@@ -29,31 +29,42 @@ services:
     networks:
       - datamasterylab
   spark-master:
-    image: bitnami/spark:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
     container_name: spark-master
     environment:
       - SPARK_MODE=master
     ports:
       - "7077:7077"
       - "8080:8080"
-    networks:
-      - datamasterylab
     volumes:
       - ./jobs:/opt/bitnami/spark/jobs
-
+    networks:
+      - datamasterylab
 
   spark-worker-1:
-    image: bitnami/spark:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
     container_name: spark-worker-1
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
     depends_on:
       - spark-master
-    networks:
-      - datamasterylab
     volumes:
       - ./jobs:/opt/bitnami/spark/jobs
+    networks:
+      - datamasterylab
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    networks:
+      - datamasterylab
 
 networks:
   datamasterylab:
