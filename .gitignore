@@ -1,5 +1,5 @@
 __pycache__/
-.env
+/newenv
 docker-compose.override.yml
 *.log
 *.pyc
