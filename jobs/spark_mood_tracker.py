@@ -58,7 +58,7 @@ weather_windowed = weather.withWatermark("event_time", "1 minute").groupBy(
 joined = traffic_windowed.join(
     weather_windowed,
     on="window",
-    how="outer"
+    how="outer" # must be changed to inner
 )
 
 
