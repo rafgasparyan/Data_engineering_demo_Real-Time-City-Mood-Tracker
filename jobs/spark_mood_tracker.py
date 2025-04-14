@@ -8,7 +8,6 @@ spark = SparkSession.builder \
     .config("spark.sql.shuffle.partitions", "2") \
     .getOrCreate()
 
-# SCHEMAS
 traffic_schema = StructType() \
     .add("intersection", StringType()) \
     .add("vehicle_id", StringType()) \
@@ -21,7 +20,6 @@ weather_schema = StructType() \
     .add("windspeed", DoubleType()) \
     .add("weather", StringType())
 
-# TRAFFIC
 traffic_raw = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
@@ -34,7 +32,6 @@ traffic = traffic_raw.selectExpr("CAST(value AS STRING)") \
     .selectExpr("t.intersection", "t.speed", "to_timestamp(t.timestamp) as event_time") \
     .withColumn("event_time", date_trunc("minute", col("event_time")))
 
-# WEATHER
 weather_raw = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
@@ -47,7 +44,6 @@ weather = weather_raw.selectExpr("CAST(value AS STRING)") \
     .selectExpr("w.temp", "w.windspeed", "w.weather", "to_timestamp(w.timestamp) as event_time") \
     .withColumn("event_time", date_trunc("minute", col("event_time")))
 
-# WINDOWING
 traffic_windowed = traffic.withWatermark("event_time", "1 minute").groupBy(
     window("event_time", "1 minute"), "intersection"
 ).agg(expr("avg(speed) as avg_speed"))
@@ -59,7 +55,6 @@ weather_windowed = weather.withWatermark("event_time", "1 minute").groupBy(
     expr("first(weather) as weather")
 )
 
-# JOIN
 joined = traffic_windowed.join(
     weather_windowed,
     on="window",
