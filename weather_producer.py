@@ -48,4 +48,4 @@ while True:
         print("Sent:", payload)
     else:
         print("API error:", r.status_code)
-    time.sleep(300)
+    time.sleep(30)

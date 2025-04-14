@@ -1,4 +1,5 @@
 from kafka import KafkaProducer
+from datetime import datetime, timezone
 import json
 import random
 import time
@@ -17,7 +18,7 @@ def generate_traffic_data():
         'intersection': random.choice(intersections),
         'vehicle_id': f'veh-{random.randint(1000, 9999)}',
         'speed': round(random.uniform(10, 90), 2),
-        'timestamp': time.time()
+        'timestamp': datetime.now(timezone.utc).isoformat(timespec='seconds')
     }
 
 
@@ -25,4 +26,4 @@ while True:
     traffic_event = generate_traffic_data()
     producer.send('traffic', value=traffic_event)
     print(f"Sent: {traffic_event}")
-    time.sleep(1)
+    time.sleep(5)
