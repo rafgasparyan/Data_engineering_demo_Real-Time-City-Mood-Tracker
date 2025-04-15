@@ -34,18 +34,22 @@ WEATHER_CODE_MAP = {
 }
 
 while True:
-    r = requests.get(URL, timeout=10)
-    if r.ok and "current_weather" in r.json():
-        cw = r.json()["current_weather"]
+    try:
+        r = requests.get(URL, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        cw = data["current_weather"]
         payload = {
             "timestamp": cw["time"],
             "temp": cw["temperature"],
             "windspeed": cw["windspeed"],
             "weather": WEATHER_CODE_MAP.get(cw["weathercode"], "unknown")
-
         }
         producer.send("weather", value=payload)
         print("Sent:", payload)
-    else:
-        print("API error:", r.status_code)
+    except Exception as e:
+        print("Weather API error:", e)
+        time.sleep(10)
+        continue
+
     time.sleep(30)
