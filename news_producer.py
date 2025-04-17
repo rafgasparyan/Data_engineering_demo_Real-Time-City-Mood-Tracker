@@ -2,6 +2,7 @@ from kafka import KafkaProducer
 import json
 import time
 import random
+from datetime import datetime, timedelta
 
 producer = KafkaProducer(
     bootstrap_servers='localhost:29092',
@@ -9,19 +10,23 @@ producer = KafkaProducer(
 )
 
 sample_news = [
-    "Massive protest in city center causes traffic delays.",
-    "Sunny day brings more people outside.",
-    "Police report a smooth commute this morning.",
-    "Heavy rain expected later today.",
-    "Accident reported near Tumanyan intersection.",
-    "Public transport strike continues for 3rd day.",
-    "Festival on Mashtots draws large crowds."
+    {"headline": "Massive protest in city center causes traffic delays.", "sentiment": "negative"},
+    {"headline": "Sunny day brings more people outside.", "sentiment": "positive"},
+    {"headline": "Police report a smooth commute this morning.", "sentiment": "positive"},
+    {"headline": "Heavy rain expected later today.", "sentiment": "neutral"},
+    {"headline": "Accident reported near Tumanyan intersection.", "sentiment": "negative"},
+    {"headline": "Public transport strike continues for 3rd day.", "sentiment": "negative"},
+    {"headline": "Festival on Mashtots draws large crowds.", "sentiment": "positive"}
 ]
 
+
 while True:
+    timestamp = datetime.utcnow().replace(second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+    selected = random.choice(sample_news)
     news_event = {
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "headline": random.choice(sample_news)
+        "timestamp": timestamp,
+        "headline": random.choice(sample_news),
+        "sentiment": selected["sentiment"]
     }
     producer.send("news", value=news_event)
     print("Sent:", news_event)

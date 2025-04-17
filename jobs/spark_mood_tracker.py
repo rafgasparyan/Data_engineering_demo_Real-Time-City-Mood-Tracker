@@ -20,6 +20,11 @@ weather_schema = StructType() \
     .add("windspeed", DoubleType()) \
     .add("weather", StringType())
 
+news_schema = StructType() \
+    .add("timestamp", TimestampType()) \
+    .add("headline", StringType()) \
+    .add("sentiment", StringType())
+
 traffic_raw = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
@@ -27,10 +32,16 @@ traffic_raw = spark.readStream \
     .option("startingOffsets", "latest") \
     .load()
 
+
+
+
 traffic = traffic_raw.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), traffic_schema).alias("t")) \
     .selectExpr("t.intersection", "t.speed", "to_timestamp(t.timestamp) as event_time") \
     .withColumn("event_time", date_trunc("minute", col("event_time")))
+
+
+
 
 weather_raw = spark.readStream \
     .format("kafka") \
@@ -39,27 +50,51 @@ weather_raw = spark.readStream \
     .option("startingOffsets", "latest") \
     .load()
 
+
+
+
+
 weather = weather_raw.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), weather_schema).alias("w")) \
     .selectExpr("w.temp", "w.windspeed", "w.weather", "to_timestamp(w.timestamp) as event_time") \
     .withColumn("event_time", date_trunc("minute", col("event_time")))
 
-traffic_windowed = traffic.withWatermark("event_time", "1 minute").groupBy(
-    window("event_time", "1 minute"), "intersection"
-).agg(expr("avg(speed) as avg_speed"))
 
-weather_windowed = weather.withWatermark("event_time", "1 minute").groupBy(
-    window("event_time", "1 minute")
-).agg(
-    expr("avg(temp) as avg_temp"),
-    expr("first(weather) as weather")
-)
 
-joined = traffic_windowed.join(
-    weather_windowed,
-    on="window",
-    how="outer" # must be changed to inner
-)
+
+
+
+news_raw = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka:9092") \
+    .option("subscribe", "news") \
+    .option("startingOffsets", "latest") \
+    .load()
+
+
+news = news_raw.selectExpr("CAST(value AS STRING)") \
+    .select(from_json(col("value"), news_schema).alias("n")) \
+    .selectExpr("to_timestamp(n.timestamp) as event_time", "n.sentiment") \
+    .withColumn("event_time", date_trunc("minute", col("event_time")))
+
+
+traffic_grouped = traffic.withWatermark("event_time", "1 minute").groupBy("event_time", "intersection") \
+    .agg(expr("avg(speed) as avg_speed"))
+
+weather_grouped = weather.withWatermark("event_time", "1 minute").groupBy("event_time") \
+    .agg(
+        expr("avg(temp) as avg_temp"),
+        expr("first(weather) as weather")
+    )
+
+news_grouped = news.withWatermark("event_time", "1 minute").groupBy("event_time") \
+    .agg(
+        expr("first(sentiment) as sentiment")
+    )
+
+
+joined = traffic_grouped.join(weather_grouped, on="event_time", how="left") \
+                        .join(news_grouped, on="event_time", how="left")
 
 
 
@@ -73,11 +108,14 @@ STRESSFUL_WEATHER = {
     "thunderstorm", "thunderstorm_with_hail"
 }
 
-def label_mood(avg_speed, weather):
+
+def label_mood(avg_speed, weather, sentiment):
     if avg_speed is None or weather is None:
         return "unknown"
 
-    if avg_speed > 60 and weather in RELAXING_WEATHER:
+    if sentiment == "negative":
+        return "tense"
+    elif avg_speed > 60 and weather in RELAXING_WEATHER:
         return "relaxed"
     elif avg_speed < 30 and weather in STRESSFUL_WEATHER:
         return "stressed"
@@ -90,14 +128,17 @@ def label_mood(avg_speed, weather):
 
 
 mood_udf = udf(label_mood, StringType())
-result = joined.withColumn("mood", mood_udf("avg_speed", "weather"))
+result = joined.withColumn("mood", mood_udf("avg_speed", "weather", "sentiment"))
 
-result.writeStream \
-    .outputMode("append") \
-    .foreachBatch(lambda df, batchId: df.show(truncate=False)) \
-    .start()
+
+
+
 
 def write_to_mongo(df, batch_id):
+    print(f"[BATCH {batch_id}] Row count: {df.count()}")
+    df.printSchema()
+    df.show(5, truncate=False)
+
     data = df.na.drop().toPandas().to_dict("records")
     print(f"[BATCH {batch_id}] Writing {len(data)} records to MongoDB")
     if data:

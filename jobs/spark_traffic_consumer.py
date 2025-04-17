@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, when
-from pyspark.sql.types import StructType, StringType, DoubleType
+from pyspark.sql.types import StructType, StringType, DoubleType, TimestampType
 from pymongo import MongoClient
 
 spark = SparkSession.builder \
@@ -11,7 +11,7 @@ schema = StructType() \
     .add("intersection", StringType()) \
     .add("vehicle_id", StringType()) \
     .add("speed", DoubleType()) \
-    .add("timestamp", DoubleType())
+    .add("timestamp", TimestampType())
 
 df_raw = spark.readStream \
     .format("kafka") \
@@ -33,10 +33,14 @@ df_scored = df_parsed.withColumn(
 
 
 def write_to_mongo(batch_df, batch_id):
+
+
     records = batch_df.toPandas().to_dict("records")
+    print(f"[BATCH {batch_id}] Writing {len(records)} records to MongoDB")
+
     if records:
         client = MongoClient("mongodb://mongo:27017/")
-        db = client["city_traffic"]
+        db = client["city_mood"]
         collection = db["traffic_events"]
         collection.insert_many(records)
         client.close()
