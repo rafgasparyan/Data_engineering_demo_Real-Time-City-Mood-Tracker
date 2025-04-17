@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col
-from pyspark.sql.types import StructType, DoubleType, StringType
+from pyspark.sql.types import StructType, DoubleType, StringType, TimestampType
 from pymongo import MongoClient
 
 spark = SparkSession.builder \
@@ -8,7 +8,7 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 schema = StructType() \
-    .add("timestamp", StringType()) \
+    .add("timestamp", TimestampType()) \
     .add("temp", DoubleType()) \
     .add("windspeed", DoubleType()) \
     .add("weather", StringType())
@@ -28,7 +28,7 @@ def write_to_mongo(batch_df, batch_id):
     records = batch_df.toPandas().to_dict("records")
     if records:
         client = MongoClient("mongodb://mongo:27017/")
-        db = client["city_weather"]
+        db = client["city_mood"]
         collection = db["weather_events"]
         collection.insert_many(records)
         client.close()

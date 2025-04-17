@@ -1,4 +1,5 @@
 import json, time, requests
+from datetime import datetime, timedelta
 from kafka import KafkaProducer
 
 URL = (
@@ -39,8 +40,10 @@ while True:
         r.raise_for_status()
         data = r.json()
         cw = data["current_weather"]
+        # using datetime instead of open-mateo API, since open-mateo sends the same data for the last 15 minutes
+        timestamp = datetime.utcnow().replace(second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
         payload = {
-            "timestamp": cw["time"],
+            "timestamp": timestamp,
             "temp": cw["temperature"],
             "windspeed": cw["windspeed"],
             "weather": WEATHER_CODE_MAP.get(cw["weathercode"], "unknown")
@@ -52,4 +55,4 @@ while True:
         time.sleep(10)
         continue
 
-    time.sleep(30)
+    time.sleep(1)
