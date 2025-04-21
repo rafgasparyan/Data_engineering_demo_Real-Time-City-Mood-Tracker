@@ -48,4 +48,3 @@ with DAG(
     )
 
 
-# just to check if the restrict rule not to push on main works or no
