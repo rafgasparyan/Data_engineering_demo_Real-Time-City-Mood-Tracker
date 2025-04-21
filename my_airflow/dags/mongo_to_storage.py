@@ -46,3 +46,6 @@ with DAG(
         task_id="export_mongo_to_file",
         python_callable=export_mongo_to_file
     )
+
+
+# just to check if the restrict rule not to push on main works or no
