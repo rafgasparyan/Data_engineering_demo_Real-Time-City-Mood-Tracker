@@ -85,11 +85,11 @@ services:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__LOGGING__LOGGING_LEVEL=INFO
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-      - ./airflow/requirements.txt:/requirements.txt
-      - ./airflow/mounted_exports:/opt/airflow/mounted_exports
+      - ./my_airflow/dags:/opt/airflow/dags
+      - ./my_airflow/logs:/opt/airflow/logs
+      - ./my_airflow/plugins:/opt/airflow/plugins
+      - ./my_airflow/requirements.txt:/requirements.txt
+      - ./my_airflow/mounted_exports:/opt/airflow/mounted_exports
     ports:
       - "8081:8080"
     networks:
@@ -111,10 +111,10 @@ services:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__LOGGING__LOGGING_LEVEL=INFO
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-      - ./airflow/plugins:/opt/airflow/plugins
-      - ./airflow/mounted_exports:/opt/airflow/mounted_exports
+      - ./my_airflow/dags:/opt/airflow/dags
+      - ./my_airflow/logs:/opt/airflow/logs
+      - ./my_airflow/plugins:/opt/airflow/plugins
+      - ./my_airflow/mounted_exports:/opt/airflow/mounted_exports
     networks:
       - datamasterylab
     command: bash -c "airflow db migrate && airflow scheduler"

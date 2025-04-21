@@ -32,16 +32,10 @@ traffic_raw = spark.readStream \
     .option("startingOffsets", "latest") \
     .load()
 
-
-
-
 traffic = traffic_raw.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), traffic_schema).alias("t")) \
     .selectExpr("t.intersection", "t.speed", "to_timestamp(t.timestamp) as event_time") \
     .withColumn("event_time", date_trunc("minute", col("event_time")))
-
-
-
 
 weather_raw = spark.readStream \
     .format("kafka") \
@@ -50,19 +44,10 @@ weather_raw = spark.readStream \
     .option("startingOffsets", "latest") \
     .load()
 
-
-
-
-
 weather = weather_raw.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), weather_schema).alias("w")) \
     .selectExpr("w.temp", "w.windspeed", "w.weather", "to_timestamp(w.timestamp) as event_time") \
     .withColumn("event_time", date_trunc("minute", col("event_time")))
-
-
-
-
-
 
 news_raw = spark.readStream \
     .format("kafka") \
@@ -71,33 +56,27 @@ news_raw = spark.readStream \
     .option("startingOffsets", "latest") \
     .load()
 
-
 news = news_raw.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), news_schema).alias("n")) \
     .selectExpr("to_timestamp(n.timestamp) as event_time", "n.sentiment") \
     .withColumn("event_time", date_trunc("minute", col("event_time")))
-
 
 traffic_grouped = traffic.withWatermark("event_time", "1 minute").groupBy("event_time", "intersection") \
     .agg(expr("avg(speed) as avg_speed"))
 
 weather_grouped = weather.withWatermark("event_time", "1 minute").groupBy("event_time") \
     .agg(
-        expr("avg(temp) as avg_temp"),
-        expr("first(weather) as weather")
-    )
+    expr("avg(temp) as avg_temp"),
+    expr("first(weather) as weather")
+)
 
 news_grouped = news.withWatermark("event_time", "1 minute").groupBy("event_time") \
     .agg(
-        expr("first(sentiment) as sentiment")
-    )
-
+    expr("first(sentiment) as sentiment")
+)
 
 joined = traffic_grouped.join(weather_grouped, on="event_time", how="left") \
-                        .join(news_grouped, on="event_time", how="left")
-
-
-
+    .join(news_grouped, on="event_time", how="left")
 
 RELAXING_WEATHER = {"clear", "mainly_clear", "partly_cloudy"}
 STRESSFUL_WEATHER = {
@@ -131,9 +110,6 @@ mood_udf = udf(label_mood, StringType())
 result = joined.withColumn("mood", mood_udf("avg_speed", "weather", "sentiment"))
 
 
-
-
-
 def write_to_mongo(df, batch_id):
     print(f"[BATCH {batch_id}] Row count: {df.count()}")
     df.printSchema()
@@ -146,6 +122,7 @@ def write_to_mongo(df, batch_id):
         db = client["city_mood"]
         db["mood_events"].insert_many(data)
         client.close()
+
 
 result.writeStream \
     .foreachBatch(write_to_mongo) \
