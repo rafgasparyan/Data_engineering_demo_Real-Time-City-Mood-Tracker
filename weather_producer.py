@@ -30,6 +30,11 @@ WEATHER_CODE_MAP = {
     71: "snow_slight",
     73: "snow_moderate",
     75: "snow_heavy",
+    80: "rain_showers_slight",
+    81: "rain_showers_moderate",
+    82: "rain_showers_heavy",
+    85: "snow_showers_slight",
+    86: "snow_showers_heavy",
     95: "thunderstorm",
     96: "thunderstorm_with_hail",
 }
@@ -42,6 +47,7 @@ while True:
         cw = data["current_weather"]
         # using datetime instead of open-mateo API, since open-mateo sends the same data for the last 15 minutes
         timestamp = datetime.utcnow().replace(second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+        print(cw)
         payload = {
             "timestamp": timestamp,
             "temp": cw["temperature"],
@@ -56,3 +62,5 @@ while True:
         continue
 
     time.sleep(1)
+
+

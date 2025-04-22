@@ -4,6 +4,55 @@ from datetime import datetime
 from pymongo import MongoClient
 import json
 import os
+import psycopg2
+
+
+def load_to_postgres():
+    with open("/opt/airflow/mounted_exports/mood_export.json") as f:
+        records = json.load(f)
+
+    if not records:
+        print("No data to insert.")
+        return
+
+    conn = psycopg2.connect(
+        host="postgres",
+        database="airflow",
+        user="airflow",
+        password="airflow"
+    )
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS mood_events (
+            event_time TIMESTAMP,
+            intersection TEXT,
+            avg_speed FLOAT,
+            avg_temp FLOAT,
+            weather TEXT,
+            sentiment TEXT,
+            mood TEXT
+        )
+    """)
+
+    for record in records:
+        cur.execute("""
+            INSERT INTO mood_events (event_time, intersection, avg_speed, avg_temp, weather, sentiment, mood)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            record["event_time"],
+            record["intersection"],
+            record["avg_speed"],
+            record["avg_temp"],
+            record["weather"],
+            record["sentiment"],
+            record["mood"]
+        ))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    print(f"Inserted {len(records)} records into PostgreSQL.")
 
 
 def convert_datetime(obj):
@@ -46,3 +95,12 @@ with DAG(
         task_id="export_mongo_to_file",
         python_callable=export_mongo_to_file
     )
+
+    load_postgres_task = PythonOperator(
+        task_id="load_to_postgres",
+        python_callable=load_to_postgres
+    )
+
+    export_task >> load_postgres_task
+
+
