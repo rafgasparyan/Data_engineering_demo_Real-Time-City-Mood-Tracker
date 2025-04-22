@@ -83,7 +83,9 @@ STRESSFUL_WEATHER = {
     "overcast", "fog", "depositing_rime_fog",
     "drizzle_light", "drizzle_moderate", "drizzle_dense",
     "rain_slight", "rain_moderate", "rain_heavy",
+    "rain_showers_slight", "rain_showers_moderate", "rain_showers_heavy",
     "snow_slight", "snow_moderate", "snow_heavy",
+    "snow_showers_slight", "snow_showers_heavy",
     "thunderstorm", "thunderstorm_with_hail"
 }
 
