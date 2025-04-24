@@ -5,6 +5,24 @@ from pymongo import MongoClient
 import json
 import os
 import psycopg2
+import boto3
+
+def upload_to_s3():
+    s3 = boto3.client(
+        "s3",
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name="us-east-1"
+    )
+
+    bucket_name = "city-mood-storage"
+    file_path = "/opt/airflow/mounted_exports/mood_export.json"
+    date = datetime.utcnow().strftime("%Y-%m-%d")
+    s3_key = f"exports/mood_export_{date}.json"
+
+    s3.upload_file(file_path, bucket_name, s3_key)
+    print(f"Uploaded {file_path} to s3://{bucket_name}/{s3_key}")
+
 
 
 def load_to_postgres():
@@ -101,6 +119,12 @@ with DAG(
         python_callable=load_to_postgres
     )
 
+    upload_to_s3_task = PythonOperator(
+        task_id="upload_to_s3",
+        python_callable=upload_to_s3
+    )
+
     export_task >> load_postgres_task
+    export_task >> upload_to_s3_task
 
 
