@@ -140,6 +140,7 @@ services:
 
 volumes:
   postgres_data:
+  mongo_data:
 
 networks:
   datamasterylab:

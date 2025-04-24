@@ -7,6 +7,25 @@ import os
 import psycopg2
 import boto3
 
+
+def cleanup_mongo_db(export_path="/opt/airflow/mounted_exports/mood_export.json"):
+    print("Cleaning up MongoDB and local file...")
+
+    # Remove MongoDB data
+    client = MongoClient("mongodb://mongo:27017/")
+    db = client["city_mood"]
+    db["mood_events"].delete_many({})
+    client.close()
+    print("MongoDB cleaned.")
+
+    # Remove exported file
+    try:
+        os.remove(export_path)
+        print(f"Deleted file: {export_path}")
+    except FileNotFoundError:
+        print(f"File not found: {export_path}")
+
+
 def upload_to_s3():
     s3 = boto3.client(
         "s3",
@@ -22,7 +41,6 @@ def upload_to_s3():
 
     s3.upload_file(file_path, bucket_name, s3_key)
     print(f"Uploaded {file_path} to s3://{bucket_name}/{s3_key}")
-
 
 
 def load_to_postgres():
@@ -98,16 +116,16 @@ def export_mongo_to_file(export_path="/opt/airflow/mounted_exports/mood_export.j
 
 
 default_args = {
-    "start_date": datetime(2025, 3, 25),
+    "start_date": datetime(2025, 4, 22),
     "catchup": False
 }
 
 with DAG(
-    "mongo_to_storage",
-    schedule_interval="@daily",
-    default_args=default_args,
-    description="Export mood data from MongoDB to file (then to S3/PostgreSQL)",
-    tags=["mood-tracker"],
+        "mongo_to_storage",
+        schedule_interval="@daily",
+        default_args=default_args,
+        description="Export mood data from MongoDB to file (then to S3/PostgreSQL)",
+        tags=["mood-tracker"],
 ) as dag:
     export_task = PythonOperator(
         task_id="export_mongo_to_file",
@@ -124,7 +142,11 @@ with DAG(
         python_callable=upload_to_s3
     )
 
+    cleanup_task = PythonOperator(
+        task_id="cleanup_mongo_and_file",
+        python_callable=cleanup_mongo_db
+    )
+
     export_task >> load_postgres_task
     export_task >> upload_to_s3_task
-
-
+    [upload_to_s3_task, load_postgres_task] >> cleanup_task
