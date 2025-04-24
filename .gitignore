@@ -4,3 +4,4 @@ docker-compose.override.yml
 *.log
 *.pyc
 .idea/
+.env
