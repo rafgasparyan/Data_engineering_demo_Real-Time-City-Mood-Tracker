@@ -35,14 +35,12 @@ def notify_slack_failure(context):
 def cleanup_mongo_db(export_path="/opt/airflow/mounted_exports/mood_export.json"):
     print("Cleaning up MongoDB and local file...")
 
-    # Remove MongoDB data
     client = MongoClient("mongodb://mongo:27017/")
     db = client["city_mood"]
     db["mood_events"].delete_many({})
     client.close()
     print("MongoDB cleaned.")
 
-    # Remove exported file
     try:
         os.remove(export_path)
         print(f"Deleted file: {export_path}")
@@ -144,9 +142,6 @@ default_args = {
     "catchup": False
 }
 
-def fail_on_purpose(**context):
-    raise Exception("❌ This is a test failure!")
-
 
 with DAG(
         "mongo_to_storage",
@@ -176,16 +171,10 @@ with DAG(
         python_callable=cleanup_mongo_db
     )
 
-    fail_task = PythonOperator(
-        task_id="fail_on_purpose",
-        python_callable=fail_on_purpose,
-        on_failure_callback=notify_slack_failure
-    )
-
 
     export_task >> load_postgres_task
     export_task >> upload_to_s3_task
-    [upload_to_s3_task, load_postgres_task] >> cleanup_task >> fail_task
+    [upload_to_s3_task, load_postgres_task] >> cleanup_task
 
 
 
