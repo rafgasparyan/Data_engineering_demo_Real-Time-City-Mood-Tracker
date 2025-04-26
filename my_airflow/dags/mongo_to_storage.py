@@ -6,6 +6,30 @@ import json
 import os
 import psycopg2
 import boto3
+import requests
+
+
+def notify_slack_failure(context):
+    webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+    if not webhook_url:
+        print("No Slack webhook configured!")
+        return
+
+    task_instance = context.get('task_instance')
+    dag_id = context.get('dag').dag_id
+    execution_date = context.get('execution_date')
+
+    message = (
+        f":x: *Task Failed!* \n"
+        f"*Task*: `{task_instance.task_id}`\n"
+        f"*Dag*: `{dag_id}`\n"
+        f"*Execution Time*: `{execution_date}`"
+    )
+
+    response = requests.post(webhook_url, json={"text": message})
+
+    if response.status_code != 200:
+        print(f"Failed to send Slack notification: {response.text}")
 
 
 def cleanup_mongo_db(export_path="/opt/airflow/mounted_exports/mood_export.json"):
@@ -120,12 +144,17 @@ default_args = {
     "catchup": False
 }
 
+def fail_on_purpose(**context):
+    raise Exception("❌ This is a test failure!")
+
+
 with DAG(
         "mongo_to_storage",
         schedule_interval="@daily",
         default_args=default_args,
         description="Export mood data from MongoDB to file (then to S3/PostgreSQL)",
         tags=["mood-tracker"],
+        on_failure_callback=notify_slack_failure
 ) as dag:
     export_task = PythonOperator(
         task_id="export_mongo_to_file",
@@ -147,6 +176,17 @@ with DAG(
         python_callable=cleanup_mongo_db
     )
 
+    fail_task = PythonOperator(
+        task_id="fail_on_purpose",
+        python_callable=fail_on_purpose,
+        on_failure_callback=notify_slack_failure
+    )
+
+
     export_task >> load_postgres_task
     export_task >> upload_to_s3_task
-    [upload_to_s3_task, load_postgres_task] >> cleanup_task
+    [upload_to_s3_task, load_postgres_task] >> cleanup_task >> fail_task
+
+
+
+
