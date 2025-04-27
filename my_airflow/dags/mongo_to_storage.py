@@ -4,6 +4,7 @@ from datetime import datetime
 from pymongo import MongoClient
 import json
 import os
+from pyspark.sql import SparkSession
 import psycopg2
 import boto3
 import requests
@@ -66,51 +67,38 @@ def upload_to_s3():
 
 
 def load_to_postgres():
-    with open("/opt/airflow/mounted_exports/mood_export.json") as f:
-        records = json.load(f)
+    spark = SparkSession.builder \
+        .appName("Mood Data Validation") \
+        .config("spark.jars.packages", "org.postgresql:postgresql:42.7.2") \
+        .getOrCreate()
 
-    if not records:
+    df = spark.read.json("/opt/airflow/mounted_exports/mood_export.json")
+
+    if df.rdd.isEmpty():
         print("No data to insert.")
         return
 
-    conn = psycopg2.connect(
-        host="postgres",
-        database="airflow",
-        user="airflow",
-        password="airflow"
+    valid_df = df.filter(
+        (df.event_time.isNotNull()) &
+        (df.intersection.isNotNull()) &
+        (df.weather.isNotNull()) &
+        (df.avg_speed > 0)
     )
-    cur = conn.cursor()
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS mood_events (
-            event_time TIMESTAMP,
-            intersection TEXT,
-            avg_speed FLOAT,
-            avg_temp FLOAT,
-            weather TEXT,
-            sentiment TEXT,
-            mood TEXT
-        )
-    """)
+    print(f"Inserting {valid_df.count()} valid records...")
 
-    for record in records:
-        cur.execute("""
-            INSERT INTO mood_events (event_time, intersection, avg_speed, avg_temp, weather, sentiment, mood)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            record["event_time"],
-            record["intersection"],
-            record["avg_speed"],
-            record["avg_temp"],
-            record["weather"],
-            record["sentiment"],
-            record["mood"]
-        ))
+    valid_df.write \
+        .format("jdbc") \
+        .option("url", "jdbc:postgresql://postgres:5432/airflow") \
+        .option("dbtable", "mood_events") \
+        .option("user", "airflow") \
+        .option("password", "airflow") \
+        .option("driver", "org.postgresql.Driver") \
+        .mode("append") \
+        .save()
 
-    conn.commit()
-    cur.close()
-    conn.close()
-    print(f"Inserted {len(records)} records into PostgreSQL.")
+    spark.stop()
+    print(f"Inserted {valid_df.count()} records into PostgreSQL.")
 
 
 def convert_datetime(obj):
