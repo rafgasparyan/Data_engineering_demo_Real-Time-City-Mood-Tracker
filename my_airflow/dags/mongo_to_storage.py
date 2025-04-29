@@ -1,6 +1,7 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime
+from pyspark.sql.functions import col, to_timestamp
 from pymongo import MongoClient
 import json
 import os
@@ -74,8 +75,11 @@ def load_to_postgres():
 
     df = spark.read.json("/opt/airflow/mounted_exports/mood_export.json")
 
-    if df.rdd.isEmpty():
-        print("No data to insert.")
+    if "_corrupt_record" in df.columns:
+        df = df.filter("_corrupt_record IS NULL")
+
+    if df.count() == 0:
+        print("No valid data to process.")
         return
 
     valid_df = df.filter(
@@ -84,6 +88,8 @@ def load_to_postgres():
         (df.weather.isNotNull()) &
         (df.avg_speed > 0)
     )
+
+    valid_df = valid_df.withColumn("event_time", to_timestamp(col("event_time")))
 
     print(f"Inserting {valid_df.count()} valid records...")
 
@@ -97,8 +103,8 @@ def load_to_postgres():
         .mode("append") \
         .save()
 
-    spark.stop()
     print(f"Inserted {valid_df.count()} records into PostgreSQL.")
+    spark.stop()
 
 
 def convert_datetime(obj):
@@ -119,7 +125,8 @@ def export_mongo_to_file(export_path="/opt/airflow/mounted_exports/mood_export.j
     os.makedirs(export_dir, exist_ok=True)
 
     with open(export_path, "w") as f:
-        json.dump(records, f, indent=2, default=convert_datetime)
+        for record in records:
+            f.write(json.dumps(record, default=convert_datetime) + "\n")
 
     print("Export finished.")
     client.close()
