@@ -86,12 +86,14 @@ services:
       - AIRFLOW__WEBSERVER__WORKERS=2
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__LOGGING__LOGGING_LEVEL=INFO
+      - PYTHONPATH=/opt/airflow
     volumes:
       - ./my_airflow/dags:/opt/airflow/dags
       - ./my_airflow/logs:/opt/airflow/logs
       - ./my_airflow/plugins:/opt/airflow/plugins
       - ./my_airflow/requirements.txt:/requirements.txt
       - ./my_airflow/mounted_exports:/opt/airflow/mounted_exports
+      - ./my_airflow:/opt/airflow/my_airflow
     ports:
       - "8081:8080"
     env_file:
@@ -114,11 +116,13 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__LOGGING__LOGGING_LEVEL=INFO
+      - PYTHONPATH=/opt/airflow
     volumes:
       - ./my_airflow/dags:/opt/airflow/dags
       - ./my_airflow/logs:/opt/airflow/logs
       - ./my_airflow/plugins:/opt/airflow/plugins
       - ./my_airflow/mounted_exports:/opt/airflow/mounted_exports
+      - ./my_airflow:/opt/airflow/my_airflow
     networks:
       - datamasterylab
     env_file:

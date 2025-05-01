@@ -47,7 +47,6 @@ while True:
         cw = data["current_weather"]
         # using datetime instead of open-mateo API, since open-mateo sends the same data for the last 15 minutes
         timestamp = datetime.utcnow().replace(second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
-        print(cw)
         payload = {
             "timestamp": timestamp,
             "temp": cw["temperature"],

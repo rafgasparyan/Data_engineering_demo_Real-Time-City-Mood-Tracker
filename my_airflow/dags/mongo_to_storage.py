@@ -6,33 +6,8 @@ from pymongo import MongoClient
 import json
 import os
 from pyspark.sql import SparkSession
-import psycopg2
 import boto3
-import requests
-
-
-def notify_slack_failure(context):
-    webhook_url = os.getenv("SLACK_WEBHOOK_URL")
-    if not webhook_url:
-        print("No Slack webhook configured!")
-        return
-
-    task_instance = context.get('task_instance')
-    dag_id = context.get('dag').dag_id
-    execution_date = context.get('execution_date')
-
-    message = (
-        f":x: *Task Failed!* \n"
-        f"*Task*: `{task_instance.task_id}`\n"
-        f"*Dag*: `{dag_id}`\n"
-        f"*Execution Time*: `{execution_date}`"
-    )
-
-    response = requests.post(webhook_url, json={"text": message})
-
-    if response.status_code != 200:
-        print(f"Failed to send Slack notification: {response.text}")
-
+from my_airflow.utils.slack import notify_slack_failure
 
 def cleanup_mongo_db(export_path="/opt/airflow/mounted_exports/mood_export.json"):
     print("Cleaning up MongoDB and local file...")
