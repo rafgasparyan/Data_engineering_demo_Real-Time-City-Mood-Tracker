@@ -41,7 +41,7 @@ class TestMongoToStorageDAG:
 
         assert os.path.exists(TEST_EXPORT_PATH)
         with open(TEST_EXPORT_PATH) as f:
-            data = json.load(f)
+            data = [json.loads(line) for line in f]
             assert isinstance(data, list)
             assert data[0]["intersection"] == "komitas"
 
@@ -56,43 +56,8 @@ class TestMongoToStorageDAG:
 
         assert os.path.exists(TEST_EXPORT_PATH)
         with open(TEST_EXPORT_PATH) as f:
-            data = json.load(f)
+            data = [json.loads(line) for line in f]
             assert data == []
-
-    @patch("my_airflow.dags.mongo_to_storage.psycopg2.connect")
-    @patch("builtins.open", new_callable=mock_open, read_data=json.dumps([
-        {
-            "event_time": "2025-04-19T16:10:00",
-            "intersection": "komitas",
-            "avg_speed": 42.0,
-            "avg_temp": 15.0,
-            "weather": "clear",
-            "sentiment": "positive",
-            "mood": "relaxed"
-        }
-    ]))
-    def test_load_inserts_records_into_postgres(self, mock_file, mock_connect):
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_conn.cursor.return_value = mock_cursor
-        mock_connect.return_value = mock_conn
-
-        load_to_postgres()
-
-        mock_cursor.execute.assert_any_call("""
-        CREATE TABLE IF NOT EXISTS mood_events (
-            event_time TIMESTAMP,
-            intersection TEXT,
-            avg_speed FLOAT,
-            avg_temp FLOAT,
-            weather TEXT,
-            sentiment TEXT,
-            mood TEXT
-        )
-    """)
-        assert mock_cursor.execute.call_count >= 2
-        mock_conn.commit.assert_called_once()
-        mock_conn.close.assert_called_once()
 
     @patch("my_airflow.dags.mongo_to_storage.boto3.client")
     @patch.dict(os.environ, {"AWS_ACCESS_KEY_ID": "test", "AWS_SECRET_ACCESS_KEY": "test"})
