@@ -3,6 +3,8 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime
 from pymongo import MongoClient
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+from my_airflow.utils.slack import notify_slack_failure
+
 
 
 def check_mongo_data():
@@ -50,6 +52,7 @@ with DAG(
     default_args=default_args,
     description="Check mood data quality before exporting",
     tags=["mood-tracker", "quality"],
+    on_failure_callback=notify_slack_failure
 ) as dag:
 
     check_data_task = PythonOperator(
