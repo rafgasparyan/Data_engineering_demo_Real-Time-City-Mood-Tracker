@@ -25,5 +25,8 @@ jobs:
           pip install -r my_airflow/requirements.txt
           pip install pytest
 
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+
       - name: Run unit tests
         run: pytest tests/unit

@@ -1,6 +1,9 @@
 import os
 import json
 import pytest
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../")))
+
 from unittest.mock import patch, MagicMock, mock_open
 from my_airflow.dags.mongo_to_storage import (
     export_mongo_to_file,
