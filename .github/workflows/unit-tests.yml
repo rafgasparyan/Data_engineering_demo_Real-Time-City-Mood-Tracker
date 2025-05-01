@@ -23,7 +23,11 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r my_airflow/requirements.txt
+          pip install apache-airflow==2.8.1  # or whatever version you're using
           pip install pytest
+
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
 
       - name: Run unit tests
         run: pytest tests/unit
