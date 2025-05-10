@@ -1,10 +1,10 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, to_timestamp, udf
-from pyspark.sql.types import StructType, StringType, TimestampType
-from pymongo import MongoClient
+from pyspark.sql.functions import udf
+from pyspark.sql.types import StringType
+
 
 from jobs.stream_utils.utils import write_to_mongo_factory
-from stream_utils.kafka_reader import read_kafka_stream
+from stream_utils.utils import read_kafka_stream
 from stream_utils.schemas import news_schema
 
 spark = SparkSession.builder \
