@@ -2,27 +2,23 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, DoubleType, StringType, TimestampType
 from pymongo import MongoClient
+from stream_utils.kafka_reader import read_kafka_stream
+from jobs.stream_utils.schemas import weather_schema
 
 spark = SparkSession.builder \
     .appName("WeatherStreamConsumer") \
     .getOrCreate()
 
-schema = StructType() \
-    .add("timestamp", TimestampType()) \
-    .add("temp", DoubleType()) \
-    .add("windspeed", DoubleType()) \
-    .add("weather", StringType())
 
-df_raw = spark.readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", "kafka:9092") \
-    .option("subscribe", "weather") \
-    .option("startingOffsets", "latest") \
-    .load()
-
-df_parsed = df_raw.selectExpr("CAST(value AS STRING)") \
-    .select(from_json(col("value"), schema).alias("data")) \
-    .select("data.*")
+df_parsed = read_kafka_stream(
+    spark,
+    topic="weather",
+    schema=weather_schema,
+    alias="data",
+    select_exprs=[
+        "to_timestamp(data.timestamp) as event_time", "data.temp", "data.windspeed", "data.weather"
+    ]
+)
 
 def write_to_mongo(batch_df, batch_id):
     records = batch_df.toPandas().to_dict("records")
