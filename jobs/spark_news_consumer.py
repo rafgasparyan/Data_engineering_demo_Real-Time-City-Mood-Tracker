@@ -2,26 +2,17 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, to_timestamp, udf
 from pyspark.sql.types import StructType, StringType, TimestampType
 from pymongo import MongoClient
-
-news_schema = StructType() \
-    .add("timestamp", StringType()) \
-    .add("headline", StringType())
+from stream_utils.kafka_reader import read_kafka_stream
+from stream_utils.schemas import news_schema
 
 spark = SparkSession.builder \
     .appName("NewsConsumer") \
     .config("spark.sql.shuffle.partitions", "2") \
     .getOrCreate()
 
-news_raw = spark.readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", "kafka:9092") \
-    .option("subscribe", "news") \
-    .option("startingOffsets", "latest") \
-    .load()
-
-news = news_raw.selectExpr("CAST(value AS STRING)") \
-    .select(from_json(col("value"), news_schema).alias("n")) \
-    .selectExpr("to_timestamp(n.timestamp) as event_time", "n.headline")
+news = read_kafka_stream(spark, "news", news_schema, "n", [
+    "to_timestamp(n.timestamp) as event_time", "n.headline"
+])
 
 
 def classify_news(headline):
@@ -33,6 +24,7 @@ def classify_news(headline):
     else:
         return "neutral"
 
+
 news_udf = udf(classify_news, StringType())
 news_labeled = news.withColumn("sentiment", news_udf("headline"))
 
@@ -42,6 +34,7 @@ news_labeled.writeStream \
     .option("truncate", False) \
     .start()
 
+
 def write_to_mongo(df, batch_id):
     data = df.na.drop().toPandas().to_dict("records")
     print(f"[BATCH {batch_id}] Writing {len(data)} news records to MongoDB")
@@ -50,6 +43,7 @@ def write_to_mongo(df, batch_id):
         db = client["city_mood"]
         db["news_events"].insert_many(data)
         client.close()
+
 
 news_labeled.writeStream \
     .foreachBatch(write_to_mongo) \
