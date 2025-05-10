@@ -2,6 +2,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, when
 from pyspark.sql.types import StructType, StringType, DoubleType, TimestampType
 from pymongo import MongoClient
+
+from jobs.stream_utils.utils import write_to_mongo_factory
 from stream_utils.kafka_reader import read_kafka_stream
 from stream_utils.schemas import traffic_schema
 
@@ -26,18 +28,7 @@ df_scored = df_parsed.withColumn(
         .otherwise("light")
 )
 
-
-def write_to_mongo(batch_df, batch_id):
-    records = batch_df.toPandas().to_dict("records")
-    print(f"[BATCH {batch_id}] Writing {len(records)} records to MongoDB")
-
-    if records:
-        client = MongoClient("mongodb://mongo:27017/")
-        db = client["city_mood"]
-        collection = db["traffic_events"]
-        collection.insert_many(records)
-        client.close()
-
+write_to_mongo = write_to_mongo_factory("traffic_events", log_prefix="TRAFFIC")
 
 df_scored.writeStream \
     .foreachBatch(write_to_mongo) \

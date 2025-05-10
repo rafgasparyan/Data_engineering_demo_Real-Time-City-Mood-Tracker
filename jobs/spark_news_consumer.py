@@ -2,6 +2,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, to_timestamp, udf
 from pyspark.sql.types import StructType, StringType, TimestampType
 from pymongo import MongoClient
+
+from jobs.stream_utils.utils import write_to_mongo_factory
 from stream_utils.kafka_reader import read_kafka_stream
 from stream_utils.schemas import news_schema
 
@@ -35,14 +37,7 @@ news_labeled.writeStream \
     .start()
 
 
-def write_to_mongo(df, batch_id):
-    data = df.na.drop().toPandas().to_dict("records")
-    print(f"[BATCH {batch_id}] Writing {len(data)} news records to MongoDB")
-    if data:
-        client = MongoClient("mongodb://mongo:27017/")
-        db = client["city_mood"]
-        db["news_events"].insert_many(data)
-        client.close()
+write_to_mongo = write_to_mongo_factory("news_events", log_prefix="NEWS")
 
 
 news_labeled.writeStream \
