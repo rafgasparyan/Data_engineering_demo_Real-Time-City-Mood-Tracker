@@ -5,6 +5,7 @@ from pymongo import MongoClient
 
 from jobs.stream_utils.kafka_reader import read_kafka_stream
 from jobs.stream_utils.schemas import traffic_schema, weather_schema, news_schema
+from jobs.stream_utils.utils import write_to_mongo_factory
 
 spark = SparkSession.builder \
     .appName("MoodTracker") \
@@ -73,18 +74,7 @@ mood_udf = udf(label_mood, StringType())
 result = joined.withColumn("mood", mood_udf("avg_speed", "weather", "sentiment"))
 
 
-def write_to_mongo(df, batch_id):
-    print(f"[BATCH {batch_id}] Row count: {df.count()}")
-    df.printSchema()
-    df.show(5, truncate=False)
-
-    data = df.na.drop().toPandas().to_dict("records")
-    print(f"[BATCH {batch_id}] Writing {len(data)} records to MongoDB")
-    if data:
-        client = MongoClient("mongodb://mongo:27017/")
-        db = client["city_mood"]
-        db["mood_events"].insert_many(data)
-        client.close()
+write_to_mongo = write_to_mongo_factory("mood_events", log_prefix="MOOD")
 
 
 result.writeStream \
