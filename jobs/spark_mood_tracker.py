@@ -1,65 +1,26 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, to_timestamp, window, expr, date_trunc, udf
-from pyspark.sql.types import StructType, StringType, DoubleType, TimestampType
-from pymongo import MongoClient
+from pyspark.sql.functions import expr, udf
+from pyspark.sql.types import StringType
+
+from jobs.stream_utils.utils import read_kafka_stream
+from jobs.stream_utils.schemas import traffic_schema, weather_schema, news_schema
+from jobs.stream_utils.utils import write_to_mongo_factory
 
 spark = SparkSession.builder \
     .appName("MoodTracker") \
     .config("spark.sql.shuffle.partitions", "2") \
     .getOrCreate()
 
-traffic_schema = StructType() \
-    .add("intersection", StringType()) \
-    .add("vehicle_id", StringType()) \
-    .add("speed", DoubleType()) \
-    .add("timestamp", TimestampType())
+traffic = read_kafka_stream(spark, "traffic", traffic_schema, "t", [
+    "t.intersection", "t.speed", "to_timestamp(t.timestamp) as event_time"
+])
+weather = read_kafka_stream(spark, "weather", weather_schema, "w", [
+    "w.temp", "w.windspeed", "w.weather", "to_timestamp(w.timestamp) as event_time"
+])
+news = read_kafka_stream(spark, "news", news_schema, "n", [
+    "to_timestamp(n.timestamp) as event_time", "n.sentiment"
+])
 
-weather_schema = StructType() \
-    .add("timestamp", TimestampType()) \
-    .add("temp", DoubleType()) \
-    .add("windspeed", DoubleType()) \
-    .add("weather", StringType())
-
-news_schema = StructType() \
-    .add("timestamp", TimestampType()) \
-    .add("headline", StringType()) \
-    .add("sentiment", StringType())
-
-traffic_raw = spark.readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", "kafka:9092") \
-    .option("subscribe", "traffic") \
-    .option("startingOffsets", "latest") \
-    .load()
-
-traffic = traffic_raw.selectExpr("CAST(value AS STRING)") \
-    .select(from_json(col("value"), traffic_schema).alias("t")) \
-    .selectExpr("t.intersection", "t.speed", "to_timestamp(t.timestamp) as event_time") \
-    .withColumn("event_time", date_trunc("minute", col("event_time")))
-
-weather_raw = spark.readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", "kafka:9092") \
-    .option("subscribe", "weather") \
-    .option("startingOffsets", "latest") \
-    .load()
-
-weather = weather_raw.selectExpr("CAST(value AS STRING)") \
-    .select(from_json(col("value"), weather_schema).alias("w")) \
-    .selectExpr("w.temp", "w.windspeed", "w.weather", "to_timestamp(w.timestamp) as event_time") \
-    .withColumn("event_time", date_trunc("minute", col("event_time")))
-
-news_raw = spark.readStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", "kafka:9092") \
-    .option("subscribe", "news") \
-    .option("startingOffsets", "latest") \
-    .load()
-
-news = news_raw.selectExpr("CAST(value AS STRING)") \
-    .select(from_json(col("value"), news_schema).alias("n")) \
-    .selectExpr("to_timestamp(n.timestamp) as event_time", "n.sentiment") \
-    .withColumn("event_time", date_trunc("minute", col("event_time")))
 
 traffic_grouped = traffic.withWatermark("event_time", "1 minute").groupBy("event_time", "intersection") \
     .agg(expr("avg(speed) as avg_speed"))
@@ -112,18 +73,7 @@ mood_udf = udf(label_mood, StringType())
 result = joined.withColumn("mood", mood_udf("avg_speed", "weather", "sentiment"))
 
 
-def write_to_mongo(df, batch_id):
-    print(f"[BATCH {batch_id}] Row count: {df.count()}")
-    df.printSchema()
-    df.show(5, truncate=False)
-
-    data = df.na.drop().toPandas().to_dict("records")
-    print(f"[BATCH {batch_id}] Writing {len(data)} records to MongoDB")
-    if data:
-        client = MongoClient("mongodb://mongo:27017/")
-        db = client["city_mood"]
-        db["mood_events"].insert_many(data)
-        client.close()
+write_to_mongo = write_to_mongo_factory("mood_events", log_prefix="MOOD")
 
 
 result.writeStream \
