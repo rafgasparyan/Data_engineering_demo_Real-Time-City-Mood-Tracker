@@ -1,7 +1,7 @@
 from pymongo import MongoClient
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, date_trunc
-
+import json
 
 def read_kafka_stream(spark: SparkSession, topic: str, schema, alias: str, select_exprs: list):
     return (
@@ -20,11 +20,11 @@ def read_kafka_stream(spark: SparkSession, topic: str, schema, alias: str, selec
 
 def write_to_mongo_factory(collection_name, log_prefix=""):
     def write_to_mongo(df, batch_id):
-        data = df.na.drop().toPandas().to_dict("records")
-        print(f"[{log_prefix} BATCH {batch_id}] Writing {len(data)} records to MongoDB")
-        if data:
+        records = [json.loads(row) for row in df.na.drop().toJSON().collect()]
+        print(f"[{log_prefix} BATCH {batch_id}] Writing {len(records)} records to MongoDB")
+        if records:
             client = MongoClient("mongodb://mongo:27017/")
             db = client["city_mood"]
-            db[collection_name].insert_many(data)
+            db[collection_name].insert_many(records)
             client.close()
     return write_to_mongo
